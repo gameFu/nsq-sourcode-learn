@@ -4,7 +4,9 @@ import (
 	"log"
 	"net"
 	"nsq-learn/internal/dirlock"
+	"nsq-learn/internal/http_api"
 	"nsq-learn/internal/lg"
+	"nsq-learn/internal/util"
 	"nsq-learn/internal/version"
 	"os"
 	"sync/atomic"
@@ -17,7 +19,8 @@ type NSQD struct {
 	// 暂不明白，为甚需要对opts做原子操作
 	opts atomic.Value
 	// 路径锁
-	dl *dirlock.DirLock
+	dl        *dirlock.DirLock
+	waitGroup util.WaitGroupWrapper
 }
 
 func New(opts *Options) *NSQD {
@@ -56,10 +59,36 @@ func New(opts *Options) *NSQD {
 	return n
 }
 
+func (n *NSQD) Main() {
+	var err error
+	ctx := &context{n}
+	n.httpListener, err = net.Listen("tcp", n.getOpts().HTTPAddress)
+	if err != nil {
+		n.logf(LOG_FATAL, "listen http (%s) failed - %s", n.getOpts().HTTPAddress, err)
+		os.Exit(1)
+	}
+	// http server
+	httpServer := NewHttpServer(ctx, false, false)
+	// 异步启动
+	n.waitGroup.Wrap(func() {
+		http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
+	})
+}
+
 func (n *NSQD) swapOpts(opts *Options) {
 	n.opts.Store(opts)
 }
 
 func (n *NSQD) getOpts() *Options {
 	return n.opts.Load().(*Options)
+}
+
+// 获取nsqd进程的健康状况
+func (n *NSQD) getHealth() string {
+	return "OK"
+}
+
+// 判断nsqd是否健康
+func (n *NSQD) isHealth() bool {
+	return true
 }

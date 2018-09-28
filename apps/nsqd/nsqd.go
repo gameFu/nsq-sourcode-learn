@@ -26,6 +26,7 @@ func (p *progarm) Init(env svc.Environment) error {
 func (p *progarm) Start() error {
 	opts := nsqd.NewOptions()
 	nsqd := nsqd.New(opts)
+	nsqd.Main()
 	p.nsqd = nsqd
 	return nil
 }
