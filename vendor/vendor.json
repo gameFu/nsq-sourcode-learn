@@ -21,6 +21,12 @@
 			"revisionTime": "2018-07-15T16:18:54Z"
 		},
 		{
+			"checksumSHA1": "bE3cBUrDp3Otb0+LPwpYVo6gmsw=",
+			"path": "github.com/nsqio/go-diskqueue",
+			"revision": "74cfbc9de8399a7fa86d676b908b002120826fc0",
+			"revisionTime": "2018-03-06T15:29:00Z"
+		},
+		{
 			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
 			"path": "github.com/pmezard/go-difflib/difflib",
 			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
