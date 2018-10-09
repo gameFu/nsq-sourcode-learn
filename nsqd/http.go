@@ -2,6 +2,7 @@ package nsqd
 
 import (
 	"net/http"
+	"net/url"
 	"nsq-learn/internal/http_api"
 	"nsq-learn/internal/version"
 	"os"
@@ -32,6 +33,8 @@ func NewHttpServer(ctx *context, tlsEnabled bool, tlsRequired bool) *httpServer 
 	}
 	router.Handle("GET", "/ping", http_api.Decorate(s.pingHandler, log, http_api.PlainText))
 	router.Handle("GET", "/info", http_api.Decorate(s.doInfo, log, http_api.V1))
+	// 创建topic
+	router.Handle("POST", "/topic/create", http_api.Decorate(s.doCreateTopic, log, http_api.V1))
 	return s
 }
 
@@ -60,4 +63,29 @@ func (s *httpServer) doInfo(w http.ResponseWriter, req *http.Request, ps httprou
 // 去除了https支持
 func (s *httpServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.router.ServeHTTP(w, req)
+}
+
+func (s *httpServer) doCreateTopic(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
+	_, _, err := s.getTopicFromQuery(req)
+	return nil, err
+}
+
+func (s *httpServer) getTopicFromQuery(req *http.Request) (url.Values, *Topic, error) {
+	reqParams, err := url.ParseQuery(req.URL.RawQuery)
+	if err != nil {
+		s.ctx.nsqd.logf(LOG_ERROR, "failed to parse request params - %s", err)
+		return nil, nil, http_api.Err{400, "INVALID_REQUEST"}
+	}
+
+	topicNames, ok := reqParams["topic"]
+	if !ok {
+		return nil, nil, http_api.Err{400, "MISSING_ARG_TOPIC"}
+	}
+	topicName := topicNames[0]
+
+	// if !protocol.IsValidTopicName(topicName) {
+	// 	return nil, nil, http_api.Err{400, "INVALID_TOPIC"}
+	// }
+
+	return reqParams, s.ctx.nsqd.GetTopic(topicName), nil
 }
