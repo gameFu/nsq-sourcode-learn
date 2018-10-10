@@ -292,3 +292,30 @@ func (n *NSQD) LoadMetadata() error {
 	}
 	return nil
 }
+
+// 退出
+func (n *NSQD) Exit() {
+	// 关闭http服务
+	if n.httpListener != nil {
+		n.httpListener.Close()
+	}
+	//保存元数据
+	n.Lock()
+	err := n.PersistMetadata()
+	// 不能直接退出
+	if err != nil {
+		n.logf(LOG_ERROR, "failed to persist metadata - %s", err)
+	}
+	n.logf(LOG_INFO, "NSQ: closing topics")
+	// 关闭topic
+	for _, topic := range n.topicMap {
+		topic.Close()
+	}
+	n.Unlock()
+	n.logf(LOG_INFO, "NSQ: stopping subsystems")
+	// 挂起等待所有协程结束
+	n.waitGroup.Wait()
+	//关闭目录所
+	n.dl.Unlock()
+	n.logf(LOG_INFO, "NSQ: bye")
+}

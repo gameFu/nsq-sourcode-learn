@@ -65,3 +65,9 @@ func (t *Topic) IsPaused() bool {
 func (t *Topic) Start() {
 
 }
+
+// 关闭Topic
+func (t *Topic) Close() {
+	// 关闭文件系统
+	t.backend.Close()
+}

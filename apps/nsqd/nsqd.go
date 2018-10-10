@@ -42,6 +42,10 @@ func (p *progarm) Start() error {
 	return nil
 }
 
+// 结束
 func (p *progarm) Stop() error {
+	if p.nsqd != nil {
+		p.nsqd.Exit()
+	}
 	return nil
 }
