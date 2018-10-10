@@ -49,6 +49,7 @@ func New(opts *Options) *NSQD {
 		startTime: time.Now(),
 		dl:        dirlock.New(dataPath),
 		topicMap:  make(map[string]*Topic),
+		exitChan:  make(chan int),
 	}
 	// 初始化logger
 	if opts.Logger == nil {
@@ -152,6 +153,7 @@ func (n *NSQD) Notify(v interface{}) {
 	persist := atomic.LoadInt32(&n.isLoading) == 0
 	n.waitGroup.Wrap(func() {
 		select {
+		// 这里使用exitchan的原因是，原本下面的default是给nsqlookup发消息的通道，会有阻塞的情况，这里去监听exitchan的目的是，假如下面的操作已经在执行了，那么这里的操作不会触发，等下面操作结束后结束这个协程，如果，下面的操作还在阻塞，那么将触发这个选项，结束等待nsqlookup的通信。nsqlookup会在后面实现
 		case <-n.exitChan:
 		// 这个通知与nsqdlookup相关,由于暂时不涉及lookup相关，先使用default
 		// case n.notifyChan <- v:
@@ -313,9 +315,12 @@ func (n *NSQD) Exit() {
 	}
 	n.Unlock()
 	n.logf(LOG_INFO, "NSQ: stopping subsystems")
+	// 在wait之前执行的原因是，很多协程都一直在运行，close这个通道会给他们发送消息告诉他们需要结束了
+	close(n.exitChan)
 	// 挂起等待所有协程结束
 	n.waitGroup.Wait()
 	//关闭目录所
 	n.dl.Unlock()
+
 	n.logf(LOG_INFO, "NSQ: bye")
 }
