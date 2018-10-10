@@ -26,6 +26,17 @@ func (p *progarm) Init(env svc.Environment) error {
 func (p *progarm) Start() error {
 	opts := nsqd.NewOptions()
 	nsqd := nsqd.New(opts)
+	// 导入元数据
+	err := nsqd.LoadMetadata()
+	if err != nil {
+		// 等于打印 + 退出
+		log.Fatalf("ERROR: %s", err.Error())
+	}
+	// 持久化元数据
+	err = nsqd.PersistMetadata()
+	if err != nil {
+		log.Fatalf("ERROR: failed to persist metadata - %s", err.Error())
+	}
 	nsqd.Main()
 	p.nsqd = nsqd
 	return nil

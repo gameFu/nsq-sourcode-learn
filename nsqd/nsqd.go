@@ -3,12 +3,14 @@ package nsqd
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"nsq-learn/internal/dirlock"
 	"nsq-learn/internal/http_api"
 	"nsq-learn/internal/lg"
+	"nsq-learn/internal/protocol"
 	"nsq-learn/internal/util"
 	"nsq-learn/internal/version"
 	"os"
@@ -226,4 +228,67 @@ func writeSyncFile(fn string, data []byte) error {
 // 返回存储metadata file的文件路劲，存在当前datapath目录下的
 func newMetadataFile(opts *Options) string {
 	return path.Join(opts.DataPath, "nsqd.dat")
+}
+
+// 读取文件，允许为空
+func readOrEmpty(fn string) ([]byte, error) {
+	data, err := ioutil.ReadFile(fn)
+	if err != nil {
+		// 如果不是文件不存在错误
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to read metadata from %s - %s", fn, err)
+		}
+	}
+	return data, nil
+}
+
+type meta struct {
+	Topics []struct {
+		Name     string `json:"name"`
+		Paused   bool   `json:"paused"`
+		Channels []struct {
+			Name   string `json:"name"`
+			Paused bool   `json:"paused"`
+		} `json:"channels"`
+	} `json:"topics"`
+}
+
+// 导入元数据（Topic和channel等）
+func (n *NSQD) LoadMetadata() error {
+	//标记为正在导入状态
+	atomic.StoreInt32(&n.isLoading, 1)
+	// 结束时去除标记
+	atomic.StoreInt32(&n.isLoading, 0)
+	fn := newMetadataFile(n.getOpts())
+	// 读取文件内容
+	data, err := readOrEmpty(fn)
+	if err != nil {
+		return err
+	}
+	// 如果数据为空，则说明为全新启动的nsqd服务
+	if data == nil {
+		return nil
+	}
+	// 序列化数据
+	var m meta
+	err = json.Unmarshal(data, &m)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata in %s - %s", fn, err)
+	}
+	for _, t := range m.Topics {
+		// 首先验证是否合法
+		if !protocol.IsValidTopicName(t.Name) {
+			n.logf(LOG_WARN, "skipping creation of invalid topic %s", t.Name)
+			continue
+		}
+		// 创建topic
+		topic := n.GetTopic(t.Name)
+		// 暂停topic
+		if t.Paused {
+
+		}
+		// 开启topic
+		topic.Start()
+	}
+	return nil
 }

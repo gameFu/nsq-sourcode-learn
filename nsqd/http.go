@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"nsq-learn/internal/http_api"
+	"nsq-learn/internal/protocol"
 	"nsq-learn/internal/version"
 	"os"
 
@@ -82,6 +83,9 @@ func (s *httpServer) getTopicFromQuery(req *http.Request) (url.Values, *Topic, e
 		return nil, nil, http_api.Err{400, "MISSING_ARG_TOPIC"}
 	}
 	topicName := topicNames[0]
+	if !protocol.IsValidTopicName(topicName) {
+		return nil, nil, http_api.Err{400, "INVALID_TOPIC"}
+	}
 
 	// if !protocol.IsValidTopicName(topicName) {
 	// 	return nil, nil, http_api.Err{400, "INVALID_TOPIC"}
