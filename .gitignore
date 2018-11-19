@@ -2,4 +2,4 @@
 vendor/github.com
 vendor/golang.org
 apps/nsqd/nsqd
-apps/nsqd/nsqd.dat
+apps/nsqd/*.dat

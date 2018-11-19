@@ -36,6 +36,8 @@ func NewHttpServer(ctx *context, tlsEnabled bool, tlsRequired bool) *httpServer 
 	router.Handle("GET", "/info", http_api.Decorate(s.doInfo, log, http_api.V1))
 	// 创建topic
 	router.Handle("POST", "/topic/create", http_api.Decorate(s.doCreateTopic, log, http_api.V1))
+	// 创建channel
+	router.Handle("POST", "/channel/create", http_api.Decorate(s.doCreateChannel, log, http_api.V1))
 	return s
 }
 
@@ -71,6 +73,15 @@ func (s *httpServer) doCreateTopic(w http.ResponseWriter, req *http.Request, ps 
 	return nil, err
 }
 
+func (s *httpServer) doCreateChannel(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (interface{}, error) {
+	_, topic, channelName, err := s.getExistingTopicFromQuery(req)
+	if err != nil {
+		return nil, err
+	}
+	topic.GetChannel(channelName)
+	return nil, nil
+}
+
 func (s *httpServer) getTopicFromQuery(req *http.Request) (url.Values, *Topic, error) {
 	reqParams, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
@@ -92,4 +103,24 @@ func (s *httpServer) getTopicFromQuery(req *http.Request) (url.Values, *Topic, e
 	// }
 
 	return reqParams, s.ctx.nsqd.GetTopic(topicName), nil
+}
+
+func (s *httpServer) getExistingTopicFromQuery(req *http.Request) (*http_api.ReqParams, *Topic, string, error) {
+	reqParams, err := http_api.NewReqParams(req)
+	if err != nil {
+		s.ctx.nsqd.logf(LOG_ERROR, "failed to parse request params - %s", err)
+		return nil, nil, "", http_api.Err{400, "INVALID_REQUEST"}
+	}
+
+	topicName, channelName, err := http_api.GetTopicChannelArgs(reqParams)
+	if err != nil {
+		return nil, nil, "", http_api.Err{400, err.Error()}
+	}
+
+	topic, err := s.ctx.nsqd.GetExistingTopic(topicName)
+	if err != nil {
+		return nil, nil, "", http_api.Err{404, "TOPIC_NOT_FOUND"}
+	}
+
+	return reqParams, topic, channelName, err
 }

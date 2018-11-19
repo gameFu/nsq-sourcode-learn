@@ -2,6 +2,7 @@ package nsqd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -147,6 +148,17 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 	return t
 }
 
+// 获取已经存在的topic
+func (n *NSQD) GetExistingTopic(topicName string) (*Topic, error) {
+	n.RLock()
+	defer n.RUnlock()
+	topic, ok := n.topicMap[topicName]
+	if !ok {
+		return nil, errors.New("topic does not exist")
+	}
+	return topic, nil
+}
+
 // 触发这个方法，将会持久化metadata(包括channel和topic等数据)
 func (n *NSQD) Notify(v interface{}) {
 	// 判断是否处于loading状态，如果处于loading状态，那么，不用该进行presist metadata
@@ -260,7 +272,7 @@ func (n *NSQD) LoadMetadata() error {
 	//标记为正在导入状态
 	atomic.StoreInt32(&n.isLoading, 1)
 	// 结束时去除标记
-	atomic.StoreInt32(&n.isLoading, 0)
+	defer atomic.StoreInt32(&n.isLoading, 0)
 	fn := newMetadataFile(n.getOpts())
 	// 读取文件内容
 	data, err := readOrEmpty(fn)
