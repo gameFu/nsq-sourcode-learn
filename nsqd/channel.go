@@ -4,6 +4,7 @@ import (
 	"nsq-learn/internal/lg"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	diskqueue "github.com/nsqio/go-diskqueue"
 )
@@ -14,6 +15,7 @@ type Channel struct {
 	name           string
 	ctx            *context
 	deleteCallback func(*Channel)
+	paused         int32
 	// 是否为测试队列
 	ephemeral bool
 	// 持久化
@@ -53,5 +55,10 @@ func NewChannel(topicName string, channelName string, ctx *context, deleteCallba
 		)
 	}
 	// 持久化channel
+	c.ctx.nsqd.Notify(c)
 	return c
+}
+
+func (c *Channel) IsPaused() bool {
+	return atomic.LoadInt32(&c.paused) == 1
 }

@@ -200,7 +200,23 @@ func (n *NSQD) PersistMetadata() error {
 		topicData := make(map[string]interface{})
 		topicData["name"] = topic.name
 		topicData["paused"] = topic.IsPaused()
-		// TODO:这里有channel相关持久化逻辑，后续再处理
+		channels := []interface{}{}
+		// channel持久化
+		topic.Lock()
+		for _, channel := range topic.channelMap {
+			channel.Lock()
+			if channel.ephemeral {
+				channel.Unlock()
+				continue
+			}
+			channelData := make(map[string]interface{})
+			channelData["name"] = channel.name
+			channelData["paused"] = channel.IsPaused()
+			channels = append(channels, channelData)
+			channel.Unlock()
+		}
+		topic.Unlock()
+		topicData["channels"] = channels
 		topics = append(topics, topicData)
 	}
 	js["version"] = version.Binary
@@ -300,6 +316,16 @@ func (n *NSQD) LoadMetadata() error {
 		// 暂停topic
 		if t.Paused {
 
+		}
+		for _, c := range t.Channels {
+			if !protocol.IsValidChannelName(c.Name) {
+				n.logf(LOG_WARN, "skipping creation of invalid channel %s", c.Name)
+				continue
+			}
+			topic.GetChannel(c.Name)
+			if c.Paused {
+
+			}
 		}
 		// 开启topic
 		topic.Start()
